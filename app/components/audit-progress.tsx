@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  Loader2,
-  CheckCircle2,
-  Ban,
-} from "lucide-react";
+import { Loader2, CheckCircle2, Ban } from "lucide-react";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { cn } from "@/app/lib/utils";
@@ -41,52 +37,43 @@ export function AuditProgress({
     <section className="mx-auto max-w-6xl px-4 pb-24 sm:px-6 lg:px-8">
       <Card className="mx-auto max-w-3xl">
         <CardHeader>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-6 w-6 shrink-0 animate-spin text-primary" />
-                <div>
-                  <CardTitle className="text-xl">
-                    Auditing {displayUrlLabel(job.libraryUrl)}
-                  </CardTitle>
-                  <CardDescription>
-                    {job.source === "npm"
-                      ? "npm package"
-                      : "GitHub repository"}{" "}
-                    · started{" "}
-                    {new Date(job.startedAt).toLocaleTimeString()} ·
-                    elapsed{" "}
-                    <ElapsedTime
-                      since={job.startedAt}
-                      className="tabular-nums"
-                    />
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <Badge variant="secondary">{job.source}</Badge>
-                {job.competitionMode && (
-                  <Badge variant="outline" className="text-xs">
-                    Competition mode
-                  </Badge>
-                )}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-6 w-6 shrink-0 animate-spin text-primary" />
+              <div>
+                <CardTitle className="text-xl">
+                  Auditing {displayUrlLabel(job.libraryUrl)}
+                </CardTitle>
+                <CardDescription>
+                  {job.source === "npm" ? "npm package" : "GitHub repository"} ·
+                  started {new Date(job.startedAt).toLocaleTimeString()} ·
+                  elapsed{" "}
+                  <ElapsedTime since={job.startedAt} className="tabular-nums" />
+                </CardDescription>
               </div>
             </div>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <Badge variant="secondary">{job.source}</Badge>
+              {job.competitionMode && (
+                <Badge variant="outline" className="text-xs">
+                  Competition mode
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {job.prompt && (
             <div className="rounded-lg bg-muted/50 px-4 py-3 text-sm">
               <span className="font-medium">Custom prompt: </span>
-              <span className="text-muted-foreground">
-                {job.prompt}
-              </span>
+              <span className="text-muted-foreground">{job.prompt}</span>
             </div>
           )}
           {job.model && !job.competitionMode && (
             <div className="rounded-lg bg-muted/50 px-4 py-3 text-sm">
               <span className="font-medium">Model: </span>
               <span className="text-muted-foreground">
-                {job.model.providerId ?? job.model.provider}/
-                {job.model.model}
+                {job.model.providerId ?? job.model.provider}/{job.model.model}
               </span>
             </div>
           )}
@@ -122,8 +109,7 @@ export function AuditProgress({
                 {(job.tokensInput ?? 0) + (job.tokensOutput ?? 0) > 0 && (
                   <span className="rounded-full bg-muted px-2 py-1">
                     {(
-                      (job.tokensInput ?? 0) +
-                      (job.tokensOutput ?? 0)
+                      (job.tokensInput ?? 0) + (job.tokensOutput ?? 0)
                     ).toLocaleString()}{" "}
                     tokens
                   </span>
@@ -172,12 +158,8 @@ export function AuditProgress({
                     model={job.competitionMode.mergeModel.model}
                     progress={{
                       currentStep:
-                        job.currentStep === "judge"
-                          ? "judge"
-                          : undefined,
-                      completedSteps: job.completedSteps?.includes(
-                        "judge",
-                      )
+                        job.currentStep === "judge" ? "judge" : undefined,
+                      completedSteps: job.completedSteps?.includes("judge")
                         ? ["judge"]
                         : [],
                     }}
@@ -200,8 +182,7 @@ export function AuditProgress({
                     (step.step === "investigate" &&
                       job.currentStep === "metadata-only");
                   const stepMatchesCompleted =
-                    job.completedSteps?.includes(step.step) ??
-                    false;
+                    job.completedSteps?.includes(step.step) ?? false;
                   const metadataOnlyCompleted =
                     step.step === "investigate" &&
                     job.completedSteps?.includes("metadata-only");
@@ -255,9 +236,8 @@ export function AuditProgress({
 
           <div className="flex flex-col gap-4 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Most audits finish in up to 5 minutes. You can leave this
-              page — the audit keeps running and is tracked on the Audits
-              page.
+              Most audits finish in up to 5 minutes. You can leave this page —
+              the audit keeps running and is tracked on the Audits page.
             </p>
             <Button
               type="button"

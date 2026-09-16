@@ -60,25 +60,29 @@ export const pipelineSteps: {
     step: "download",
     icon: Database,
     label: "Fetching source code",
-    detail: "Downloading and unpacking the package tarball for code inspection.",
+    detail:
+      "Downloading and unpacking the package tarball for code inspection.",
   },
   {
     step: "investigate",
     icon: MessageSquare,
     label: "Identifying investigation areas",
-    detail: "First AI pass: pinpoint the files and patterns worth scrutinizing.",
+    detail:
+      "First AI pass: pinpoint the files and patterns worth scrutinizing.",
   },
   {
     step: "deep-dive",
     icon: Zap,
     label: "Deep-diving into code",
-    detail: "Second AI pass: analyze the selected files and produce a structured report.",
+    detail:
+      "Second AI pass: analyze the selected files and produce a structured report.",
   },
   {
     step: "judge",
     icon: Scale,
     label: "Judge merging findings",
-    detail: "Third AI pass: compare both audits, remove duplicates, and combine unique findings.",
+    detail:
+      "Third AI pass: compare both audits, remove duplicates, and combine unique findings.",
   },
   {
     step: "validate",

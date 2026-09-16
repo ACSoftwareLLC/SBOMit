@@ -134,9 +134,7 @@ export function AuditForm({
         return;
       }
       try {
-        const res = await fetch(
-          `/api/search?q=${encodeURIComponent(trimmed)}`,
-        );
+        const res = await fetch(`/api/search?q=${encodeURIComponent(trimmed)}`);
         if (!res.ok) return;
         const data = (await res.json()) as { packages: Suggestion[] };
         setSuggestions(data.packages || []);
@@ -510,31 +508,25 @@ export function AuditForm({
                   className="flex w-full items-center justify-between"
                   aria-pressed={competitionMode}
                 >
-                  <span className="text-sm font-medium">
-                    Competition mode
-                  </span>
+                  <span className="text-sm font-medium">Competition mode</span>
                   <span
                     className={cn(
                       "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      competitionMode
-                        ? "bg-primary"
-                        : "bg-muted-foreground/30",
+                      competitionMode ? "bg-primary" : "bg-muted-foreground/30",
                     )}
                   >
                     <span
                       className={cn(
                         "inline-block h-4 w-4 transform rounded-full bg-background transition-transform",
-                        competitionMode
-                          ? "translate-x-6"
-                          : "translate-x-1",
+                        competitionMode ? "translate-x-6" : "translate-x-1",
                       )}
                     />
                   </span>
                 </button>
                 <p className="text-xs text-muted-foreground">
-                  Run two models against the same audit in parallel,
-                  then use a third model to remove duplicates and
-                  combine the results into one report.
+                  Run two models against the same audit in parallel, then use a
+                  third model to remove duplicates and combine the results into
+                  one report.
                 </p>
 
                 {competitionMode && (
@@ -566,7 +558,7 @@ export function AuditForm({
             )}
           </div>
 
-            <Button
+          <Button
             type="submit"
             disabled={
               loading ||
@@ -628,8 +620,8 @@ export function AuditForm({
         <div className="mx-auto mt-4 flex max-w-2xl items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
-            Saved {savedDeps.count} direct dependencies to D1 (audit{" "}
-            #{savedDeps.auditId}).
+            Saved {savedDeps.count} direct dependencies to D1 (audit #
+            {savedDeps.auditId}).
           </p>
         </div>
       )}
@@ -645,8 +637,8 @@ export function AuditForm({
         <div className="mx-auto mt-4 flex max-w-2xl items-start gap-3 rounded-xl border border-border bg-muted/50 px-4 py-3 text-left text-muted-foreground">
           <Ban className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
-            Audit cancelled. No report was generated — start a new
-            audit whenever you&apos;re ready.
+            Audit cancelled. No report was generated — start a new audit
+            whenever you&apos;re ready.
           </p>
         </div>
       )}

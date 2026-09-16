@@ -54,9 +54,7 @@ export function ModelPicker({
         <select
           id={inputId}
           value={value.model}
-          onChange={(e) =>
-            onChange({ ...value, model: e.target.value })
-          }
+          onChange={(e) => onChange({ ...value, model: e.target.value })}
           disabled={!selectedConfig || selectedConfig.models.length === 0}
           aria-label={`${label} model`}
           className="h-10 w-full appearance-none rounded-lg border border-border bg-background px-2 pr-6 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"

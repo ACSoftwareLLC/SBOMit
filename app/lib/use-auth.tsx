@@ -37,13 +37,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiFetch<{ user: AuthUser | null }>("/api/auth/session", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      const data = await apiFetch<{ user: AuthUser | null }>(
+        "/api/auth/session",
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+        },
+      );
       setUser(data.user ?? null);
     } catch (err) {
-      const status = typeof err === "object" && err !== null ? (err as { status?: number }).status : undefined;
+      const status =
+        typeof err === "object" && err !== null
+          ? (err as { status?: number }).status
+          : undefined;
       if (status === 401) {
         setUser(null);
         return;
@@ -63,14 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = React.useCallback(async (username: string, password: string) => {
-    const data = await apiFetchJson<{ user?: AuthUser }>(
-      "/api/auth/login",
-      { username, password },
-      { credentials: "same-origin" },
-    );
-    setUser(data.user ?? null);
-  }, []);
+  const login = React.useCallback(
+    async (username: string, password: string) => {
+      const data = await apiFetchJson<{ user?: AuthUser }>(
+        "/api/auth/login",
+        { username, password },
+        { credentials: "same-origin" },
+      );
+      setUser(data.user ?? null);
+    },
+    [],
+  );
 
   const register = React.useCallback(
     async (input: {

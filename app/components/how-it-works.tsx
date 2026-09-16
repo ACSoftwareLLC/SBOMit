@@ -32,8 +32,8 @@ export function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Enter an npm package URL, a GitHub repo URL, or just a
-              package name. We fetch the latest metadata.
+              Enter an npm package URL, a GitHub repo URL, or just a package
+              name. We fetch the latest metadata.
             </p>
           </CardContent>
         </Card>
@@ -60,8 +60,8 @@ export function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Receive a structured audit with a trust score, risk
-              breakdown, dependency tree, and license analysis.
+              Receive a structured audit with a trust score, risk breakdown,
+              dependency tree, and license analysis.
             </p>
           </CardContent>
         </Card>

@@ -133,7 +133,6 @@ export default function Home() {
           />
         )}
 
-
         {result && (
           <AuditResultTabs
             result={result}

@@ -31,7 +31,9 @@ test.describe("audit form provider selection (mocked /api/providers)", () => {
   test("provider select populates from API", async ({ page }) => {
     const provider = page.getByLabel("AI provider");
     await expect(provider).toHaveValue("cfg-openai");
-    await expect(provider.getByRole("option", { name: /openai test/i })).toHaveCount(1);
+    await expect(
+      provider.getByRole("option", { name: /openai test/i }),
+    ).toHaveCount(1);
     await expect(
       provider.getByRole("option", { name: /anthropic test/i }),
     ).toHaveCount(1);
@@ -45,7 +47,9 @@ test.describe("audit form provider selection (mocked /api/providers)", () => {
     await expect(model).toHaveValue("claude-test-sonnet");
   });
 
-  test("Audit Library enabled with provider and model selected", async ({ page }) => {
+  test("Audit Library enabled with provider and model selected", async ({
+    page,
+  }) => {
     await page
       .getByPlaceholder("npm package or GitHub URL, e.g. lodash")
       .fill("lodash");

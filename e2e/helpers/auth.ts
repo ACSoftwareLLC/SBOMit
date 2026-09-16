@@ -44,9 +44,7 @@ export async function registerViaApi(
  * Create a fresh account (server-side registration sets the session cookie)
  * and land on the authenticated home page.
  */
-export async function registerAndLogin(
-  page: Page,
-): Promise<TestAccount> {
+export async function registerAndLogin(page: Page): Promise<TestAccount> {
   const account = makeTestAccount();
   await registerViaApi(page, account);
   await page.goto("/");

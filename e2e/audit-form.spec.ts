@@ -13,12 +13,12 @@ test.describe("audit form", () => {
     await expect(page.getByLabel("Version")).toBeVisible();
     await expect(page.getByLabel("AI provider")).toBeVisible();
     await expect(page.getByLabel("Model")).toBeVisible();
-    await expect(
-      page.getByPlaceholder(/optional prompt/i),
-    ).toBeVisible();
+    await expect(page.getByPlaceholder(/optional prompt/i)).toBeVisible();
   });
 
-  test("Audit Library button disabled until URL is filled", async ({ page }) => {
+  test("Audit Library button disabled until URL is filled", async ({
+    page,
+  }) => {
     const submit = page.getByRole("button", { name: /audit library/i });
     await expect(submit).toBeDisabled();
 
@@ -44,9 +44,7 @@ test.describe("audit form", () => {
       route.fulfill({ json: { providers: [] } }),
     );
     await page.goto("/");
-    await expect(
-      page.getByText(/add an llm provider in/i),
-    ).toBeVisible();
+    await expect(page.getByText(/add an llm provider in/i)).toBeVisible();
   });
 
   test("Advanced panel reveals competition mode controls", async ({ page }) => {
