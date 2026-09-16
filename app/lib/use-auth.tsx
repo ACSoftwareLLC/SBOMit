@@ -26,7 +26,9 @@ export interface UseAuthResult {
   logout: () => Promise<void>;
 }
 
-export function useAuth(): UseAuthResult {
+const AuthContext = React.createContext<UseAuthResult | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -54,8 +56,9 @@ export function useAuth(): UseAuthResult {
   }, []);
 
   React.useEffect(() => {
-    // Initial session load on mount. Data fetching from the server is an
-    // intentional side effect here because this hook has no server render.
+    // Single shared session load on app mount. Fetching from the server is
+    // an intentional side effect here because the provider owns the session
+    // state for the whole tree.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [refresh]);
@@ -94,13 +97,18 @@ export function useAuth(): UseAuthResult {
     setUser(null);
   }, []);
 
-  return {
-    user,
-    loading,
-    error,
-    refresh,
-    login,
-    register,
-    logout,
-  };
+  const value = React.useMemo(
+    () => ({ user, loading, error, refresh, login, register, logout }),
+    [user, loading, error, refresh, login, register, logout],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): UseAuthResult {
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
 }
