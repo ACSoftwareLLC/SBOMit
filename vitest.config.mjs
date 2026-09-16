@@ -28,5 +28,6 @@ export default defineConfig({
   test: {
     setupFiles: ["./test/apply-migrations.ts"],
     globals: true,
+    exclude: ["node_modules/**", "e2e/**"],
   },
 });
