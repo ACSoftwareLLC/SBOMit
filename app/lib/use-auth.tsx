@@ -26,7 +26,9 @@ export interface UseAuthResult {
   logout: () => Promise<void>;
 }
 
-export function useAuth(): UseAuthResult {
+const AuthContext = React.createContext<UseAuthResult | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -35,13 +37,19 @@ export function useAuth(): UseAuthResult {
     try {
       setLoading(true);
       setError(null);
-      const data = await apiFetch<{ user: AuthUser | null }>("/api/auth/session", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      const data = await apiFetch<{ user: AuthUser | null }>(
+        "/api/auth/session",
+        {
+          credentials: "same-origin",
+          cache: "no-store",
+        },
+      );
       setUser(data.user ?? null);
     } catch (err) {
-      const status = typeof err === "object" && err !== null ? (err as { status?: number }).status : undefined;
+      const status =
+        typeof err === "object" && err !== null
+          ? (err as { status?: number }).status
+          : undefined;
       if (status === 401) {
         setUser(null);
         return;
@@ -54,20 +62,24 @@ export function useAuth(): UseAuthResult {
   }, []);
 
   React.useEffect(() => {
-    // Initial session load on mount. Data fetching from the server is an
-    // intentional side effect here because this hook has no server render.
+    // Single shared session load on app mount. Fetching from the server is
+    // an intentional side effect here because the provider owns the session
+    // state for the whole tree.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [refresh]);
 
-  const login = React.useCallback(async (username: string, password: string) => {
-    const data = await apiFetchJson<{ user?: AuthUser }>(
-      "/api/auth/login",
-      { username, password },
-      { credentials: "same-origin" },
-    );
-    setUser(data.user ?? null);
-  }, []);
+  const login = React.useCallback(
+    async (username: string, password: string) => {
+      const data = await apiFetchJson<{ user?: AuthUser }>(
+        "/api/auth/login",
+        { username, password },
+        { credentials: "same-origin" },
+      );
+      setUser(data.user ?? null);
+    },
+    [],
+  );
 
   const register = React.useCallback(
     async (input: {
@@ -94,13 +106,18 @@ export function useAuth(): UseAuthResult {
     setUser(null);
   }, []);
 
-  return {
-    user,
-    loading,
-    error,
-    refresh,
-    login,
-    register,
-    logout,
-  };
+  const value = React.useMemo(
+    () => ({ user, loading, error, refresh, login, register, logout }),
+    [user, loading, error, refresh, login, register, logout],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): UseAuthResult {
+  const context = React.useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
 }

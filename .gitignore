@@ -46,3 +46,7 @@ worker-configuration.d.ts
 
 # opennext
 .open-next/
+
+# Playwright (e2e)
+test-results/
+playwright-report/

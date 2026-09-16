@@ -1,4 +1,7 @@
-import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
+import {
+  cloudflareTest,
+  readD1Migrations,
+} from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,5 +31,6 @@ export default defineConfig({
   test: {
     setupFiles: ["./test/apply-migrations.ts"],
     globals: true,
+    exclude: ["node_modules/**", "e2e/**"],
   },
 });
