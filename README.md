@@ -56,6 +56,12 @@ app/
     audit-jobs.tsx            Global audit job state
     report-view.tsx           Reusable report renderer + export
     competition-readout.tsx   Competition-mode results
+    audit-form.tsx            Audit input form (URL, version, provider, prompt)
+    audit-progress.tsx        In-flight audit progress card
+    audit-result-tabs.tsx     Result report tabs (overview, risks, CVEs, …)
+    model-picker.tsx          Provider + model selection control
+    model-progress-card.tsx   Per-model progress steps
+    how-it-works.tsx          Landing explainer section
     site-header.tsx
   lib/
     api.ts                    Route helpers (parseJsonBody, withErrorHandling)

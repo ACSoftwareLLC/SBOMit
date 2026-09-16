@@ -93,11 +93,9 @@ interface LibraryContext {
 - **GitHub adapter** — parses `/<owner>/<repo>`, fetches
   `https://api.github.com/repos/<owner>/<repo>` with a `User-Agent` header.
   404 → `RepoNotFoundError`; 403/429 → `UpstreamRateLimitError` with optional
-  `Retry-After` header.
-
-**Known gap:** GitHub resolution does not fetch `package.json`, so GitHub
-audits have no dependency data. Planned: fetch `raw.githubusercontent.com`
-manifest (see §7.2).
+  `Retry-After` header. The adapter also fetches the repo's `package.json`
+  from `raw.githubusercontent.com` so GitHub audits include dependency data
+  (see §3.3).
 
 ### 3.3 Enrichment (Shipped)
 
@@ -304,14 +302,14 @@ anonymous. Turnstile gate if abuse appears (see TODO §4.4).
    `LibraryContext` adapter contract; the rest of the pipeline is unchanged.
 2. **Signals** — new enrichment signals register in the enrichment registry
    and optionally extend the scoring rubric.
-3. **GitHub manifest fetch** — pull `package.json` from the default branch to
-   close the GitHub dependency gap (`/api/dependencies` parity with npm).
-4. **Re-audit scheduling** — Cron Trigger re-runs audits for watchlisted
-   packages and diffs against the previous `audit_reports` row (v2).
-5. **Auth context consolidation** — move the per-page `useAuth` guards into a
-   top-level `AuthProvider` to eliminate duplicate session fetches.
-6. **Page component extraction** — break the 1,800-line `app/page.tsx` into
-   focused components (`audit-form`, `audit-progress`, `audit-result-tabs`).
+3. **Re-audit scheduling** — Cron Trigger re-runs audits for watchlisted
+   packages and diffs against the previous `audit_reports` row (v2; see
+   TODO.md Milestone 3).
+4. **Auth context consolidation** — **shipped**: `useAuth` is a top-level
+   `AuthProvider` in `app/layout.tsx` (single shared session fetch).
+5. **Page component extraction** — **shipped**: `app/page.tsx` is pure
+   orchestration (~156 lines); the form, progress card, result tabs,
+   model picker, and explainer live in `app/components/`.
 
 ---
 
