@@ -19,6 +19,26 @@ test.describe("audit form", () => {
   test("Audit Library button disabled until URL is filled", async ({
     page,
   }) => {
+    // CI runs against a fresh D1 with no configured providers; mock one so
+    // the submit gate (selectedConfig && effectiveModel) can ever be true.
+    // The route must be live before the form mounts, so reload after
+    // registering — beforeEach already navigated.
+    await page.route("**/api/providers", (route) =>
+      route.fulfill({
+        json: {
+          providers: [
+            {
+              id: "cfg-openai",
+              name: "OpenAI Test",
+              provider: "openai",
+              models: ["gpt-test-mini"],
+              isDefault: true,
+            },
+          ],
+        },
+      }),
+    );
+    await page.reload();
     const submit = page.getByRole("button", { name: /audit library/i });
     await expect(submit).toBeDisabled();
 
