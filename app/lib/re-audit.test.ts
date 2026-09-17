@@ -171,6 +171,71 @@ describe("runReAuditTick", () => {
     expect(runAuditMock).not.toHaveBeenCalled();
   });
 
+  it("budget exhaustion breaks the loop: no later target is attempted", async () => {
+    const u = await seedUser("ra_c2");
+    await addWatchlistItem(env.DB, {
+      user_id: u,
+      source: "npm",
+      name: "first",
+      url: "first",
+    });
+    await addWatchlistItem(env.DB, {
+      user_id: u,
+      source: "npm",
+      name: "second",
+      url: "second",
+    });
+    // First budget check (for whichever target is processed first) fails.
+    vi.mocked(checkProviderBudget).mockRejectedValueOnce(
+      new Error("RATE_LIMIT_EXCEEDED"),
+    );
+
+    const result = await runReAuditTick(env.DB, { limit: 5 });
+    expect(result.stoppedReason).toBe("budget");
+    // `break`, not `continue`: zero attempts, no audits, neither target marked.
+    expect(result.attempted).toBe(0);
+    expect(runAuditMock).not.toHaveBeenCalled();
+    const targets = await getEligibleReAuditTargets(env.DB, 10, 24);
+    expect(targets.map((t) => t.name).sort()).toEqual(["first", "second"]);
+  });
+
+  it("resolves the default provider for scheduled runs", async () => {
+    const u = await seedUser("ra_prov1");
+    await addWatchlistItem(env.DB, {
+      user_id: u,
+      source: "npm",
+      name: "prov",
+      url: "prov",
+    });
+    await env.DB.exec(
+      `INSERT INTO providers (id, name, provider, api_key, models, is_default, created_at) VALUES` +
+        `('cfg-first', 'First', 'openai', 'k', '["m"]', 0, '2026-01-01 00:00:00'),` +
+        `('cfg-default', 'Default', 'openai', 'k', '["m"]', 1, '2026-01-02 00:00:00');`,
+    );
+
+    await runReAuditTick(env.DB, { limit: 5 });
+    expect(runAuditMock.mock.calls[0][0].providerId).toBe("cfg-default");
+  });
+
+  it("falls back to the first provider when none is default", async () => {
+    const u = await seedUser("ra_prov2");
+    await addWatchlistItem(env.DB, {
+      user_id: u,
+      source: "npm",
+      name: "prov",
+      url: "prov",
+    });
+    await env.DB.exec(
+      `INSERT INTO providers (id, name, provider, api_key, models, is_default, created_at) VALUES` +
+        `('cfg-older', 'Older', 'openai', 'k', '["m"]', 0, '2026-01-01 00:00:00'),` +
+        `('cfg-newer', 'Newer', 'openai', 'k', '["m"]', 0, '2026-01-02 00:00:00');`,
+    );
+
+    await runReAuditTick(env.DB, { limit: 5 });
+    // listProviders orders by created_at ASC; the first row wins.
+    expect(runAuditMock.mock.calls[0][0].providerId).toBe("cfg-older");
+  });
+
   it("failed targets are not marked audited (retry next tick)", async () => {
     const u = await seedUser("ra_d");
     await addWatchlistItem(env.DB, {

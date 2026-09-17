@@ -54,8 +54,15 @@ export function diffReports(prev: AuditResult, next: AuditResult): ReportDiff {
 
   const prevCves = new Set(prev.cves.map((c) => c.id));
   const nextCves = new Set(next.cves.map((c) => c.id));
-  const newCves = next.cves.filter((c) => !prevCves.has(c.id));
-  const resolvedCves = prev.cves.filter((c) => !nextCves.has(c.id));
+  // Dedupe by id: repeated advisories for one CVE must not inflate diff counts.
+  const seenNew = new Set<string>();
+  const newCves = next.cves.filter(
+    (c) => !prevCves.has(c.id) && !seenNew.has(c.id) && seenNew.add(c.id),
+  );
+  const seenResolved = new Set<string>();
+  const resolvedCves = prev.cves.filter(
+    (c) => !nextCves.has(c.id) && !seenResolved.has(c.id) && seenResolved.add(c.id),
+  );
 
   return {
     scoreDelta: next.score - prev.score,

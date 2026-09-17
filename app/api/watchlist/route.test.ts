@@ -153,6 +153,20 @@ describe("/api/watchlist", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 401 before body parsing on POST with malformed JSON and no session", async () => {
+    // The valid-body variant above cannot distinguish auth-first from
+    // parse-first ordering (a valid body parses fine either way). Raw
+    // garbage pins it: parse-first would 400, auth-first answers 401.
+    const res = await POST(
+      new Request("http://localhost/api/watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "not json",
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
   it("creates a watchlist item from a bare npm package name and lists it", async () => {
     const user = await seedUser("wl_route_a");
 
@@ -360,5 +374,30 @@ describe("/api/watchlist", () => {
     ).json()) as { items: unknown[] };
     expect(list1.items).toHaveLength(0);
     expect(list2.items).toHaveLength(1);
+  });
+
+  it("DELETE with neither id nor libraryUrl returns 400", async () => {
+    const user = await seedUser("wl_route_i");
+    const res = await DELETE(
+      jsonRequest("/api/watchlist", "DELETE", {}, user.cookie),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("MISSING_INPUT");
+  });
+
+  it("DELETE by libraryUrl for a package never watched returns 404", async () => {
+    const user = await seedUser("wl_route_j");
+    const res = await DELETE(
+      jsonRequest(
+        "/api/watchlist",
+        "DELETE",
+        { libraryUrl: "https://www.npmjs.com/package/never-watched" },
+        user.cookie,
+      ),
+    );
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("NOT_FOUND");
   });
 });

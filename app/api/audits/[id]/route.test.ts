@@ -349,6 +349,38 @@ describe("GET /api/audits/[id] diff", () => {
     expect(body.report.previousReportId).toBeNull();
     expect(body.report.previousReportPublicId).toBeNull();
   });
+
+  it("schema-invalid-but-valid-JSON previous result_json with ?diff=1 returns triple-null payload", async () => {
+    // Pins the auditResultSchema.parse branch the invalid-JSON test above
+    // cannot reach: the payload parses as JSON but fails the Zod schema
+    // (missing required fields).
+    await seedDiffReport({
+      publicId: "aschemabadprev",
+      createdAt: "2026-01-01 00:00:00",
+      result: JSON.stringify({}),
+    });
+    const newer = await seedDiffReport({
+      publicId: "aschemabadnew",
+      createdAt: "2026-02-01 00:00:00",
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${newer.id}?diff=1`),
+      { params: Promise.resolve({ id: String(newer.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      report: {
+        diff: unknown;
+        previousReportId: number | null;
+        previousReportPublicId: string | null;
+      };
+    };
+    expect(body.report.diff).toBeNull();
+    expect(body.report.previousReportId).toBeNull();
+    expect(body.report.previousReportPublicId).toBeNull();
+  });
 });
 
 describe("DELETE /api/audits/[id]", () => {

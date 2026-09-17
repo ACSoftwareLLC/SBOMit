@@ -116,4 +116,15 @@ describe("diffReports", () => {
     expect(JSON.stringify(prev)).toBe(prevSnapshot);
     expect(JSON.stringify(next)).toBe(nextSnapshot);
   });
+
+  it("dedupes repeated CVE ids so diff counts are not inflated", () => {
+    const prev = makeResult();
+    const next = makeResult({ cves: [cve("CVE-1"), cve("CVE-1"), cve("CVE-2")] });
+    const diff = diffReports(prev, next);
+    expect(diff.advisories.newCves.map((c) => c.id)).toEqual(["CVE-1", "CVE-2"]);
+
+    const back = diffReports(next, makeResult({ cves: [cve("CVE-1")] }));
+    // CVE-2 resolved once; CVE-1 unchanged (not resolved).
+    expect(back.advisories.resolvedCves.map((c) => c.id)).toEqual(["CVE-2"]);
+  });
 });
