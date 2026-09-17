@@ -23,6 +23,7 @@ AI-powered security audits for npm libraries and GitHub repositories. Paste a pa
 - **Usage statistics** — Per-user and overall token use, audit counts, and score distributions.
 - **Watchlist re-audits** — Watch a package on the audits page; a Cloudflare Cron Trigger re-audits watched packages every 6 hours and diffs consecutive reports.
 - **Report diffs** — Score delta plus new/resolved risks and advisories between consecutive audits of the same package.
+- **Watch notifications** — In-app bell feed: watchers get notified when a scheduled re-audit surfaces a significant change (new critical/high risk, new CVE, or a score drop ≥ 10).
 - **Health check** — `GET /api/health` verifies D1 and OpenAI bindings.
 
 ## Tech Stack
@@ -50,6 +51,7 @@ app/
     providers/                provider CRUD + /[id]/models
     reports/[id]/             GET → fetch a stored report
     watchlist/                GET/POST/DELETE → per-user watched packages
+    notifications/            GET → user notification feed; /read → mark read
     search/                   GET → npm package autocomplete
     users/me/                 GET/PUT current user; /stats, /reports
     versions/                 GET → npm package versions
@@ -65,6 +67,7 @@ app/
     model-picker.tsx          Provider + model selection control
     model-progress-card.tsx   Per-model progress steps
     how-it-works.tsx          Landing explainer section
+    notification-bell.tsx     Unread-count bell + dropdown feed in the header
     site-header.tsx
   lib/
     api.ts                    Route helpers (parseJsonBody, withErrorHandling)
@@ -73,7 +76,7 @@ app/
     cache.ts                  Cached-report lookup
     codebase.ts               Tarball inspection
     cve.ts                    CVE enrichment
-    db/                       D1 helpers split by domain
+    db/                       D1 helpers split by domain (incl. notifications)
     dependencies.ts           Transitive dependency walker
     errors.ts                 Typed API error helpers
     format.ts                 Timestamp / duration / token formatters
@@ -81,6 +84,7 @@ app/
     providers.ts              Provider config utilities
     rate-limit.ts             Per-IP token bucket
     re-audit.ts               Scheduled watchlist re-audit tick runner
+    notifications.ts          Diff-significance gate + watcher fan-out
     report-diff.ts            Pure diff between consecutive audit reports
     run-audit.ts              Audit pipeline orchestration
     score.ts                  Deterministic scoring rubric
@@ -183,7 +187,7 @@ Tests run inside the Cloudflare Workers runtime using `@cloudflare/vitest-pool-w
 npm run test
 ```
 
-This applies D1 migrations to an isolated local database and runs unit/integration tests for library resolution, rate limiting, error handling, dependency walking, D1 helpers, auth, watchlist, the re-audit runner, report diffing, and LLM orchestration.
+This applies D1 migrations to an isolated local database and runs unit/integration tests for library resolution, rate limiting, error handling, dependency walking, D1 helpers, auth, watchlist, the re-audit runner, report diffing, notifications, and LLM orchestration.
 
 End-to-end tests run against a local dev server with Playwright:
 
@@ -267,6 +271,14 @@ Liveness check. Returns `ok`/`degraded` and binding status.
 ### `GET /api/search?q=<query>`
 
 Search npm packages for autocomplete.
+
+### `GET /api/notifications`
+
+List the current user's notifications (newest first). Query params: `?unread=1` (only unread), `?limit=` (1–100, default 20), `?offset=`. Returns `{ items, unreadCount, nextOffset? }`; `items` carry resolved `reportPublicId` / `previousReportPublicId` (`null` if the report was deleted).
+
+### `POST /api/notifications/read`
+
+Mark notifications read: `{ ids: [1, 2] }` (max 99, empty array is a no-op) or `{}` (mark all). Returns `{ updated }`.
 
 ### Auth endpoints
 

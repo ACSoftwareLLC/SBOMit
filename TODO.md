@@ -6,23 +6,26 @@ Each milestone gets its own spec → plan → implementation cycle when it start
 **Current state:** 1.x (user system) shipped. Milestone 2 (foundation
 cleanup) shipped — page extraction, auth consolidation, doc refresh.
 Milestone 3 (re-audit scheduling) shipped — watchlist, cron re-audits,
-report diffs. Milestone 4 (diff notifications) is the next featureset.
-Milestone 5 collects the remaining backlog.
+report diffs. Milestone 4 (diff notifications) shipped — bell feed for
+significant re-audit diffs. Milestone 5 collects the remaining backlog.
 
 ---
 
-## Milestone 4 — Diff notifications (architectural)
+## Milestone 4 — Diff notifications (architectural) — ✅ SHIPPED
 
 Goal: close the loop M3 opened. Watchlisted packages get re-audited on
-the cron schedule and diffs are computed — but watchers must currently
-rediscover them manually. M4 notifies each watcher when a re-audit of
-their watched package produces a meaningful change. Explicitly deferred
-in the M3 spec ("notifications land later").
+the cron schedule and diffs are computed — M4 notifies each watcher when
+a re-audit of their watched package produces a meaningful change
+(explicitly deferred in the M3 spec). Shipped: `notifications` table
+(`0015_notifications.sql`), significance gate + collapse-unread fan-out
+(`app/lib/notifications.ts` — new critical/high risk, new CVE, or score
+drop ≥ 10), best-effort generation inside `runReAuditTick`
+(`details[].notifyError`), `GET /api/notifications` +
+`POST /api/notifications/read`, and `NotificationBell` in the site
+header (60s + focus polling). Spec:
+`docs/superpowers/specs/2026-09-17-diff-notifications-design.md`.
 
-User-approved scope (brainstorm 2026-09-17): **in-app feed only**
-(bell icon, unread count, mark-read — D1-backed, works for every user,
-no external dependencies); **generated in the cron tick** (no separate
-scheduling pass). Email/webhook channels stay out of scope.
+Original shape (all landed, with the resolved decisions):
 
 ### 4.1 Schema + generation
 
@@ -55,9 +58,9 @@ scheduling pass). Email/webhook channels stay out of scope.
 - e2e: bell renders with badge after seeding a notification directly
   via API/DB; clicking navigates to the report.
 
-Open questions to resolve at spec time: dedupe (same target audited
-twice before a user reads — collapse or stack?), badge polling cadence,
-and whether `notifyWatchersOfDiff` blocks the tick or best-effort.
+Open questions resolved during brainstorm/spec: same-target unread
+notifications collapse (read rows survive); best-effort in-tick
+generation (`notifyError` on details); 60s + focus badge polling.
 
 ---
 
