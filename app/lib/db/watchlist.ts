@@ -82,7 +82,7 @@ export async function getEligibleReAuditTargets(
        LEFT JOIN watchlist_targets t ON t.source = w.source AND t.name = w.name
        GROUP BY w.source, w.name
        HAVING t.last_audited_at IS NULL
-          OR t.last_audited_at <= datetime('now', '-' || ? || ' hours')
+          OR t.last_audited_at <= strftime('%Y-%m-%dT%H:%M:%fZ','now','-' || ? || ' hours')
        ORDER BY t.last_audited_at IS NOT NULL, t.last_audited_at ASC
        LIMIT ?`,
     )

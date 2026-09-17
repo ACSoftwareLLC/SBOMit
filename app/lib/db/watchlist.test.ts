@@ -145,6 +145,34 @@ describe("watchlist db helpers", () => {
     await markTargetAudited(env.DB, "npm", "marked");
   });
 
+  it("boundary: 25h-old target is eligible at minAgeHours=24 regardless of format", async () => {
+    // Regression for the cutoff format bug: stored timestamps use ISO 'T'
+    // format while datetime('now',...) yields a space separator, so
+    // lexicographic comparison wrongly excluded targets stored on the
+    // cutoff's calendar date. The fix compares strftime ISO on both sides.
+    const uid = await seedUser("wl_g");
+    await addWatchlistItem(env.DB, {
+      user_id: uid,
+      source: "npm",
+      name: "boundary",
+      url: "https://www.npmjs.com/package/boundary",
+    });
+
+    const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000)
+      .toISOString()
+      .replace(".", "."); // YYYY-MM-DDTHH:MM:SS.SSSZ, same shape markTargetAudited writes
+    await env.DB
+      .prepare(
+        "INSERT INTO watchlist_targets (source, name, last_audited_at) VALUES (?, ?, ?) " +
+          "ON CONFLICT (source, name) DO UPDATE SET last_audited_at = excluded.last_audited_at",
+      )
+      .bind("npm", "boundary", twentyFiveHoursAgo)
+      .run();
+
+    const targets = await getEligibleReAuditTargets(env.DB, 10, 24);
+    expect(targets.map((t) => t.name)).toContain("boundary");
+  });
+
   it("removeByUrl only touches the caller's row", async () => {
     const u1 = await seedUser("wl_f1");
     const u2 = await seedUser("wl_f2");
