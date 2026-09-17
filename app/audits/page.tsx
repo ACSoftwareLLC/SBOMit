@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Package,
   RefreshCw,
+  Star,
   Terminal,
   Trash2,
   X,
@@ -52,6 +53,15 @@ interface AuditHistoryItem {
   codebase_inspected: number;
 }
 
+interface WatchlistItem {
+  id: number;
+  user_id: number;
+  source: string;
+  name: string;
+  url: string;
+  created_at: string;
+}
+
 interface LoadedReport {
   reportId: number;
   result: AuditResult;
@@ -63,6 +73,11 @@ const scoreBadgeVariant = (score: number) => {
   if (score >= 60) return "warning";
   return "destructive";
 };
+
+/** Stable watchlist key — same uniqueness domain as the watchlist table. */
+function watchKey(source: string, name: string): string {
+  return `${source}:${name}`;
+}
 
 const jobStatusBadge: Record<
   AuditJob["status"],
@@ -252,6 +267,10 @@ export default function AuditsPage() {
     null,
   );
   const [expandedJobId, setExpandedJobId] = React.useState<string | null>(null);
+  const [watchedKeys, setWatchedKeys] = React.useState<Set<string>>(new Set());
+  const [watchPendingKeys, setWatchPendingKeys] = React.useState<Set<string>>(
+    new Set(),
+  );
 
   const completedCount = jobs.filter(
     (job) => job.status === "completed",
@@ -281,6 +300,82 @@ export default function AuditsPage() {
     const timer = setTimeout(() => void fetchHistory(), 0);
     return () => clearTimeout(timer);
   }, [fetchHistory, completedCount]);
+
+  const fetchWatchlist = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/watchlist", { cache: "no-store" });
+      const data = (await res.json()) as {
+        items?: WatchlistItem[];
+        error?: string;
+      };
+      if (!res.ok || data.error) {
+        // Anonymous visitors simply have no watchlist state.
+        if (res.status === 401) {
+          setWatchedKeys(new Set());
+          return;
+        }
+        throw new Error(data.error || "Failed to load watchlist.");
+      }
+      setWatchedKeys(
+        new Set((data.items ?? []).map((i) => watchKey(i.source, i.name))),
+      );
+    } catch {
+      setWatchedKeys(new Set());
+    }
+  }, []);
+
+  // Load watch state on mount.
+  React.useEffect(() => {
+    const timer = setTimeout(() => void fetchWatchlist(), 0);
+    return () => clearTimeout(timer);
+  }, [fetchWatchlist]);
+
+  const toggleWatch = React.useCallback(
+    async (item: AuditHistoryItem) => {
+      const key = watchKey(item.source, item.name);
+      const currentlyWatched = watchedKeys.has(key);
+
+      // Optimistic update; refetch on error to resync.
+      const nextKeys = new Set(watchedKeys);
+      if (currentlyWatched) {
+        nextKeys.delete(key);
+      } else {
+        nextKeys.add(key);
+      }
+      setWatchedKeys(nextKeys);
+      setWatchPendingKeys((prev) => new Set(prev).add(key));
+
+      try {
+        const res = await fetch("/api/watchlist", {
+          method: currentlyWatched ? "DELETE" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ libraryUrl: item.url }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!res.ok || data.error) {
+          throw new Error(data.error || "Failed to update watchlist.");
+        }
+        // Refetch the authoritative state on success too: a stale in-flight
+        // mount read can otherwise overwrite the optimistic update and leave
+        // the star contradicting the database.
+        await fetchWatchlist();
+      } catch (error) {
+        await fetchWatchlist();
+        setHistoryError(
+          error instanceof Error ? error.message : "Failed to update watchlist.",
+        );
+      } finally {
+        setWatchPendingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    [watchedKeys, fetchWatchlist],
+  );
 
   // Auto-reset the delete confirmation after a few seconds.
   React.useEffect(() => {
@@ -687,6 +782,37 @@ export default function AuditsPage() {
                           )}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-pressed={watchedKeys.has(
+                              watchKey(item.source, item.name),
+                            )}
+                            aria-label={
+                              watchedKeys.has(watchKey(item.source, item.name))
+                                ? `Stop watching ${item.name}`
+                                : `Watch ${item.name}`
+                            }
+                            title={
+                              watchedKeys.has(watchKey(item.source, item.name))
+                                ? "Watching — click to stop"
+                                : "Watch for scheduled re-audits"
+                            }
+                            disabled={watchPendingKeys.has(
+                              watchKey(item.source, item.name),
+                            )}
+                            onClick={() => void toggleWatch(item)}
+                          >
+                            <Star
+                              className={
+                                watchedKeys.has(
+                                  watchKey(item.source, item.name),
+                                )
+                                  ? "h-4 w-4 fill-yellow-400 text-yellow-500"
+                                  : "h-4 w-4 text-muted-foreground"
+                              }
+                            />
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

@@ -3,10 +3,12 @@ import {
   getAuditById,
   getAuditReportById,
   getDb,
+  getPreviousAuditReport,
 } from "@/app/lib/db";
 import { MissingInputError, ReportNotFoundError } from "@/app/lib/errors";
 import type { LlmInteraction } from "@/app/lib/llm";
-import type { AuditResult } from "@/app/lib/audit";
+import { auditResultSchema, type AuditResult } from "@/app/lib/audit";
+import { diffReports } from "@/app/lib/report-diff";
 import { withErrorHandling } from "@/app/lib/api";
 
 function parseReportId(id: string): number {
@@ -18,7 +20,7 @@ function parseReportId(id: string): number {
 }
 
 export const GET = withErrorHandling(async (
-  _request: Request,
+  request: Request,
   ctx: RouteContext<"/api/audits/[id]">,
 ): Promise<Response> => {
   const { id } = await ctx.params;
@@ -45,6 +47,49 @@ export const GET = withErrorHandling(async (
       : [interactions]
     : undefined;
 
+  // ?diff=1 additionally compares this report against the newest earlier
+  // default-prompt report for the same name+source (on-read diffing; see
+  // docs/superpowers/specs/2026-09-16-re-audit-scheduling-design.md §6).
+  let diffPayload: {
+    diff: ReturnType<typeof diffReports> | null;
+    previousReportId: number | null;
+    previousReportPublicId: string | null;
+  } | undefined;
+  const url = new URL(request.url);
+  if (url.searchParams.get("diff") === "1") {
+    const previous = await getPreviousAuditReport(
+      db,
+      audit.name,
+      audit.source,
+      report.created_at,
+    );
+    if (previous && previous.id !== report.id) {
+      try {
+        const previousResult = auditResultSchema.parse(
+          JSON.parse(previous.result_json),
+        );
+        diffPayload = {
+          diff: diffReports(previousResult, result),
+          previousReportId: previous.id,
+          previousReportPublicId: previous.public_id,
+        };
+      } catch {
+        // Previous report is corrupted — report no diff rather than failing.
+        diffPayload = {
+          diff: null,
+          previousReportId: null,
+          previousReportPublicId: null,
+        };
+      }
+    } else {
+      diffPayload = {
+        diff: null,
+        previousReportId: null,
+        previousReportPublicId: null,
+      };
+    }
+  }
+
   return Response.json(
     {
       audit: {
@@ -61,6 +106,7 @@ export const GET = withErrorHandling(async (
         model: report.model,
         score: report.score,
         created_at: report.created_at,
+        ...(diffPayload ?? {}),
       },
       result,
       interactions: normalizedInteractions,

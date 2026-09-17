@@ -96,6 +96,8 @@ export interface RunAuditInput {
   baseUrl?: string;
   competitionMode?: CompetitionModeConfig;
   userId?: number;
+  /** Re-audit mode: skip cache reads and persist without a cache key. */
+  skipCache?: boolean;
 }
 
 export interface RunAuditResult {
@@ -437,11 +439,13 @@ export async function runAudit(
     primaryConfig.model,
   );
 
-  const cached = await getCachedAuditReport(
-    dbInstance,
-    cacheKey,
-    fullContext.version,
-  );
+  const cached = input.skipCache
+    ? null
+    : await getCachedAuditReport(
+        dbInstance,
+        cacheKey,
+        fullContext.version,
+      );
 
   if (cached) {
     const result = storedReportToResult(cached);
@@ -598,7 +602,7 @@ export async function runAudit(
     model,
     score: result.score,
     resultJson,
-    cacheKey,
+    cacheKey: input.skipCache ? undefined : cacheKey,
     interactionJson,
     codebaseInspected,
     userId: input.userId,

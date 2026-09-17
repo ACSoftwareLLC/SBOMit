@@ -4,11 +4,13 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import { Loader2, Package } from "lucide-react";
 import { SiteHeader } from "@/app/components/site-header";
+import { ReportDiffCard } from "@/app/components/report-diff-card";
 import { ReportView } from "@/app/components/report-view";
 import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent } from "@/app/components/ui/card";
 import type { AuditResult } from "@/app/lib/audit";
+import type { ReportDiff } from "@/app/lib/report-diff";
 import type { LlmInteraction } from "@/app/lib/llm";
 
 interface ReportPageData {
@@ -26,6 +28,10 @@ interface ReportPageData {
     model: string;
     score: number;
     created_at: string;
+    /** Present only when fetched with ?diff=1. */
+    diff?: ReportDiff | null;
+    previousReportId?: number | null;
+    previousReportPublicId?: string | null;
   };
   result: AuditResult;
   interactions?: LlmInteraction[];
@@ -57,7 +63,7 @@ export default function ReportPage() {
 
     async function load() {
       try {
-        const res = await fetch(`/api/audits/${reportId}`, {
+        const res = await fetch(`/api/audits/${reportId}?diff=1`, {
           cache: "no-store",
         });
         const payload = (await res.json()) as ReportPageData & {
@@ -101,6 +107,9 @@ export default function ReportPage() {
             </Card>
           ) : data ? (
             <div className="space-y-6">
+              {data.report.diff && (
+                <ReportDiffCard diff={data.report.diff} />
+              )}
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

@@ -302,9 +302,12 @@ anonymous. Turnstile gate if abuse appears (see TODO §4.4).
    `LibraryContext` adapter contract; the rest of the pipeline is unchanged.
 2. **Signals** — new enrichment signals register in the enrichment registry
    and optionally extend the scoring rubric.
-3. **Re-audit scheduling** — Cron Trigger re-runs audits for watchlisted
-   packages and diffs against the previous `audit_reports` row (v2; see
-   TODO.md Milestone 3).
+3. **Re-audit scheduling** — **shipped**: per-user watchlist, custom-worker
+   Cron Trigger (`worker.ts` + `wrangler.jsonc` triggers) re-runs watched
+   packages every 6h via `runReAuditTick` (`app/lib/re-audit.ts`), respecting
+   provider daily budgets; `diffReports` (`app/lib/report-diff.ts`) computes
+   on-read diffs surfaced on `/report/[id]`. Admin trigger:
+   `POST /api/admin/re-audit`.
 4. **Auth context consolidation** — **shipped**: `useAuth` is a top-level
    `AuthProvider` in `app/layout.tsx` (single shared session fetch).
 5. **Page component extraction** — **shipped**: `app/page.tsx` is pure
@@ -333,3 +336,6 @@ anonymous. Turnstile gate if abuse appears (see TODO §4.4).
 | Auth / users      | `app/lib/auth.ts`, `app/api/auth/`, `app/api/users/` | shipped  |
 | Admin             | `app/api/admin/`, `app/admin/`                    | shipped  |
 | Route helpers     | `app/lib/api.ts`                                  | shipped  |
+| Watchlist         | `app/lib/db/watchlist.ts`, `app/api/watchlist/`   | shipped  |
+| Re-audit runner   | `app/lib/re-audit.ts`, `worker.ts`                | shipped  |
+| Report diffing    | `app/lib/report-diff.ts`, `app/components/report-diff-card.tsx` | shipped  |

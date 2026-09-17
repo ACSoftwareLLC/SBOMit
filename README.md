@@ -21,6 +21,8 @@ AI-powered security audits for npm libraries and GitHub repositories. Paste a pa
 - **User accounts** — Registration, login, password reset, and profile management.
 - **Admin console** — Manage users, block emails/usernames, configure providers, and set per-provider daily token budgets.
 - **Usage statistics** — Per-user and overall token use, audit counts, and score distributions.
+- **Watchlist re-audits** — Watch a package on the audits page; a Cloudflare Cron Trigger re-audits watched packages every 6 hours and diffs consecutive reports.
+- **Report diffs** — Score delta plus new/resolved risks and advisories between consecutive audits of the same package.
 - **Health check** — `GET /api/health` verifies D1 and OpenAI bindings.
 
 ## Tech Stack
@@ -40,13 +42,14 @@ app/
     audit/stream/             POST → streaming audit events (NDJSON)
     audits/                   GET → audit history; /[id] → single audit
     auth/                     login, logout, register, session, change-password, password-reset
-    admin/                    users, blocked-emails/usernames, provider-limits, stats
+    admin/                    users, blocked-emails/usernames, provider-limits, stats, re-audit
     dependencies/             POST → save direct dependency tree to D1
     dependencies/transitive/  POST → walk transitive deps depth-capped
     health/                   GET → liveness + binding check
     models/                   POST → list available models for a provider
     providers/                provider CRUD + /[id]/models
     reports/[id]/             GET → fetch a stored report
+    watchlist/                GET/POST/DELETE → per-user watched packages
     search/                   GET → npm package autocomplete
     users/me/                 GET/PUT current user; /stats, /reports
     versions/                 GET → npm package versions
@@ -77,6 +80,8 @@ app/
     llm/                      LLM client split by domain
     providers.ts              Provider config utilities
     rate-limit.ts             Per-IP token bucket
+    re-audit.ts               Scheduled watchlist re-audit tick runner
+    report-diff.ts            Pure diff between consecutive audit reports
     run-audit.ts              Audit pipeline orchestration
     score.ts                  Deterministic scoring rubric
     signals.ts                Enrichment signals
@@ -90,7 +95,9 @@ app/
 migrations/                   D1 SQL migrations
 scripts/
   apply-migrations.sh         Apply local/remote D1 migrations + regenerate types
+worker.ts                     Custom Worker entry: wraps the OpenNext fetch handler and adds the cron scheduled handler
 wrangler.jsonc                Cloudflare Worker + D1 configuration
+wrangler.test.jsonc           Test-mode Wrangler config (excludes worker.ts from the vitest entry)
 .dev.vars.example             Local secrets template
 ```
 
@@ -176,7 +183,13 @@ Tests run inside the Cloudflare Workers runtime using `@cloudflare/vitest-pool-w
 npm run test
 ```
 
-This applies D1 migrations to an isolated local database and runs unit/integration tests for library resolution, rate limiting, error handling, dependency walking, D1 helpers, auth, and LLM orchestration.
+This applies D1 migrations to an isolated local database and runs unit/integration tests for library resolution, rate limiting, error handling, dependency walking, D1 helpers, auth, watchlist, the re-audit runner, report diffing, and LLM orchestration.
+
+End-to-end tests run against a local dev server with Playwright:
+
+```bash
+npm run test:e2e
+```
 
 ## Deployment
 
@@ -193,6 +206,10 @@ npx wrangler d1 migrations apply sbomit-deps --remote
 ```
 
 > `next start` / `next build` alone are **not** the deploy path. Use the OpenNext-based `preview`/`deploy` scripts.
+
+### Scheduled re-audits
+
+A Cloudflare Cron Trigger (`0 */6 * * *`, every 6 hours) re-runs audits for watched packages. The schedule and fan-out live in `wrangler.jsonc`: adjust `triggers.crons` to change the cadence, and `vars.RE_AUDIT_MAX_PER_TICK` (default 5) to cap how many targets are re-audited per tick. Admins can also trigger a tick immediately via `POST /api/admin/re-audit`.
 
 ## API
 
@@ -237,11 +254,11 @@ Walk the npm dependency graph depth-capped (default depth 2, max 3).
 
 ### `GET /api/audits` and `GET /api/audits/[id]`
 
-List or fetch a persisted audit.
+List or fetch a persisted audit. Add `?diff=1` to `[id]` to include `{ diff, previousReportId, previousReportPublicId }` comparing this report against the newest earlier default-prompt report for the same package.
 
 ### `GET /api/reports/[id]`
 
-Fetch a stored audit report by its public ID.
+Fetch a stored audit report by its public ID. Add `?diff=1` for the same comparison payload as above (`diff` is `null` when no earlier report exists).
 
 ### `GET /api/health`
 
@@ -258,6 +275,12 @@ Search npm packages for autocomplete.
 - `POST /api/auth/password-reset`, `POST /api/auth/password-reset/confirm`
 - `GET/PUT /api/users/me`, `GET /api/users/me/stats`, `GET /api/users/me/reports`
 
+### Watchlist endpoints
+
+- `GET /api/watchlist` — list the current user's watched packages
+- `POST /api/watchlist` — `{ libraryUrl }` watch a package (npm or GitHub URL; duplicate → 409)
+- `DELETE /api/watchlist` — `{ libraryUrl }` or `{ id }` unwatch
+
 ### Admin endpoints
 
 - `GET/POST /api/admin/users`, `GET/PUT/DELETE /api/admin/users/[id]`
@@ -266,6 +289,7 @@ Search npm packages for autocomplete.
 - `GET/POST/DELETE /api/admin/blocked-usernames`
 - `GET/POST /api/admin/provider-limits`
 - `GET /api/admin/stats`
+- `POST /api/admin/re-audit` — `{ limit? }` (1–20, default 5) re-audit eligible watched packages now
 
 ## License
 

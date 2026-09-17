@@ -1,30 +1,23 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "sbomit",
+  "name": "sbomit-test",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
 
-  "main": "worker.ts",
+  "comment": "Vitest pool config. Mirrors wrangler.jsonc bindings but keeps the OpenNext generated worker as main so the test pool does not try to bundle the custom worker.ts entry (which imports .open-next/worker.js).",
+
+  "main": ".open-next/worker.js",
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
-  },
-
-  "triggers": {
-    "crons": ["0 */6 * * *"]
-  },
-
-  "vars": {
-    "RE_AUDIT_MAX_PER_TICK": "5"
   },
 
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "sbomit-deps",
-      // Replace with your real D1 database ID from `wrangler d1 list`.
-      // For local dev with `wrangler dev` this can remain as a placeholder.
-      "database_id": "ef52cc06-6339-48c4-b606-0d1e2f4b50c6",
+      "database_id": "test",
       "migrations_dir": "./migrations"
     }
   ]

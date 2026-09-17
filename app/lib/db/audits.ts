@@ -423,3 +423,28 @@ export async function getReportByPublicId(
     .bind(publicId)
     .first<StoredReport>();
 }
+
+/**
+ * Newest report for the same name+source created strictly before the given
+ * timestamp, restricted to default-prompt reports (prompt IS NULL) so a
+ * re-audit diff compares like with like.
+ */
+export async function getPreviousAuditReport(
+  db: D1Database,
+  name: string,
+  source: string,
+  beforeCreatedAt: string,
+): Promise<StoredAuditReport | null> {
+  return db
+    .prepare(
+      `SELECT ar.* FROM audit_reports ar
+       JOIN package_audits pa ON pa.id = ar.audit_id
+       WHERE pa.name = ? AND pa.source = ?
+         AND ar.prompt IS NULL
+         AND ar.created_at < ?
+       ORDER BY ar.created_at DESC, ar.id DESC
+       LIMIT 1`,
+    )
+    .bind(name, source, beforeCreatedAt)
+    .first<StoredAuditReport>();
+}

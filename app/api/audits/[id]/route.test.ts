@@ -145,6 +145,244 @@ describe("GET /api/audits/[id]", () => {
   });
 });
 
+describe("GET /api/audits/[id] diff", () => {
+  const db = env.DB;
+
+  beforeAll(async () => {
+    await setupSchema(db);
+  });
+
+  afterEach(async () => {
+    await reset();
+    await setupSchema(db);
+  });
+
+  function diffResultJson(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      name: "lodash",
+      version: "4.17.21",
+      score: 80,
+      summary: "ok",
+      risks: [
+        {
+          severity: "low",
+          title: "Prototype pollution history",
+          description: "Historical advisories resolved in 4.17.21.",
+          sources: null,
+        },
+      ],
+      investigationAreas: [],
+      deepDiveFindings: [],
+      dependencies: [],
+      license: { type: "MIT", compatible: true, note: "" },
+      maintainers: [],
+      lastPublished: "",
+      weeklyDownloads: "",
+      cves: [],
+      ...overrides,
+    });
+  }
+
+  async function seedDiffReport(
+    opts: {
+      publicId: string;
+      name?: string;
+      source?: string;
+      createdAt: string;
+      score?: number;
+      result?: string;
+    },
+  ): Promise<{ id: number; publicId: string }> {
+    const auditRes = await db
+      .prepare(
+        `INSERT INTO package_audits (name, version, source, url, audited_at) VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        opts.name ?? "lodash",
+        "4.17.21",
+        opts.source ?? "npm",
+        `https://www.npmjs.com/package/${opts.name ?? "lodash"}`,
+        opts.createdAt,
+      )
+      .run();
+    const auditId = auditRes.meta?.last_row_id as number;
+
+    const reportRes = await db
+      .prepare(
+        `INSERT INTO audit_reports (audit_id, public_id, prompt, model, score, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        auditId,
+        opts.publicId,
+        null,
+        "test-model",
+        opts.score ?? 80,
+        opts.result ?? diffResultJson(),
+        opts.createdAt,
+      )
+      .run();
+    return {
+      id: reportRes.meta?.last_row_id as number,
+      publicId: opts.publicId,
+    };
+  }
+
+  it("GET with ?diff=1 returns diff payload against the previous report", async () => {
+    const older = await seedDiffReport({
+      publicId: "adiffolder001",
+      createdAt: "2026-01-01 00:00:00",
+      score: 80,
+    });
+    const newer = await seedDiffReport({
+      publicId: "adiffnewer01",
+      createdAt: "2026-02-01 00:00:00",
+      score: 60,
+      result: diffResultJson({
+        score: 60,
+        risks: [
+          {
+            severity: "high",
+            title: "New injection risk",
+            description: "Appeared in the re-audit.",
+            sources: null,
+          },
+        ],
+      }),
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${newer.id}?diff=1`),
+      { params: Promise.resolve({ id: String(newer.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      report: {
+        diff: {
+          scoreDelta: number;
+          risks: { added: Array<{ title: string }> };
+        } | null;
+        previousReportId: number | null;
+        previousReportPublicId: string | null;
+      };
+    };
+    expect(body.report.previousReportId).toBe(older.id);
+    expect(body.report.previousReportPublicId).toBe(older.publicId);
+    expect(body.report.diff).not.toBeNull();
+    expect(body.report.diff!.scoreDelta).toBe(-20);
+    expect(body.report.diff!.risks.added.map((r) => r.title)).toContain(
+      "New injection risk",
+    );
+  });
+
+  it("GET without ?diff=1 omits diff fields entirely", async () => {
+    await seedDiffReport({
+      publicId: "anodiffold001",
+      createdAt: "2026-01-01 00:00:00",
+    });
+    const newer = await seedDiffReport({
+      publicId: "anodiffnew01",
+      createdAt: "2026-02-01 00:00:00",
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${newer.id}`),
+      { params: Promise.resolve({ id: String(newer.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { report: Record<string, unknown> };
+    expect(body.report.diff).toBeUndefined();
+    expect(body.report.previousReportId).toBeUndefined();
+    expect(body.report.previousReportPublicId).toBeUndefined();
+  });
+
+  it("first audit with ?diff=1 returns triple-null diff payload", async () => {
+    const only = await seedDiffReport({
+      publicId: "afirstonly001",
+      createdAt: "2026-01-01 00:00:00",
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${only.id}?diff=1`),
+      { params: Promise.resolve({ id: String(only.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      report: {
+        diff: unknown;
+        previousReportId: number | null;
+        previousReportPublicId: string | null;
+      };
+    };
+    expect(body.report.diff).toBeNull();
+    expect(body.report.previousReportId).toBeNull();
+    expect(body.report.previousReportPublicId).toBeNull();
+  });
+
+  it("corrupted previous result_json with ?diff=1 returns triple-null payload", async () => {
+    await seedDiffReport({
+      publicId: "acorruptprev1",
+      createdAt: "2026-01-01 00:00:00",
+      result: "{not-valid-json",
+    });
+    const newer = await seedDiffReport({
+      publicId: "acorruptnew01",
+      createdAt: "2026-02-01 00:00:00",
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${newer.id}?diff=1`),
+      { params: Promise.resolve({ id: String(newer.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      report: {
+        diff: unknown;
+        previousReportId: number | null;
+        previousReportPublicId: string | null;
+      };
+    };
+    expect(body.report.diff).toBeNull();
+    expect(body.report.previousReportId).toBeNull();
+    expect(body.report.previousReportPublicId).toBeNull();
+  });
+
+  it("schema-invalid-but-valid-JSON previous result_json with ?diff=1 returns triple-null payload", async () => {
+    // Pins the auditResultSchema.parse branch the invalid-JSON test above
+    // cannot reach: the payload parses as JSON but fails the Zod schema
+    // (missing required fields).
+    await seedDiffReport({
+      publicId: "aschemabadprev",
+      createdAt: "2026-01-01 00:00:00",
+      result: JSON.stringify({}),
+    });
+    const newer = await seedDiffReport({
+      publicId: "aschemabadnew",
+      createdAt: "2026-02-01 00:00:00",
+    });
+
+    const res = await GET(
+      new Request(`http://localhost/api/audits/${newer.id}?diff=1`),
+      { params: Promise.resolve({ id: String(newer.id) }) },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      report: {
+        diff: unknown;
+        previousReportId: number | null;
+        previousReportPublicId: string | null;
+      };
+    };
+    expect(body.report.diff).toBeNull();
+    expect(body.report.previousReportId).toBeNull();
+    expect(body.report.previousReportPublicId).toBeNull();
+  });
+});
+
 describe("DELETE /api/audits/[id]", () => {
   const db = env.DB;
 
