@@ -120,6 +120,9 @@ describe("runReAuditTick", () => {
     expect(result.succeeded).toBe(1);
     expect(runAuditMock).toHaveBeenCalledTimes(1);
     expect(runAuditMock.mock.calls[0][0].skipCache).toBe(true);
+    // The runner must pass the db explicitly so scheduled (worker) context
+    // never relies on getDb()'s ambient fallback chain.
+    expect(runAuditMock.mock.calls[0][2]).toBe(env.DB);
     const targets = await getEligibleReAuditTargets(env.DB, 10, 24);
     expect(targets.filter((t) => t.name === "one")).toHaveLength(0);
   });

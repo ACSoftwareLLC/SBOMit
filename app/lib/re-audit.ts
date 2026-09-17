@@ -57,11 +57,15 @@ export async function runReAuditTick(
 
     result.attempted += 1;
     try {
-      const run = await runAudit({
-        libraryUrl: target.url,
-        skipCache: true,
-        ...(providerId ? { providerId } : {}),
-      });
+      const run = await runAudit(
+        {
+          libraryUrl: target.url,
+          skipCache: true,
+          ...(providerId ? { providerId } : {}),
+        },
+        undefined,
+        db,
+      );
       await finalizeProviderUsage(db, providerId, {
         cached: run.meta.cached,
         reportId: run.meta.reportId,

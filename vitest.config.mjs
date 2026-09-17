@@ -14,7 +14,7 @@ export default defineConfig({
       const migrationsPath = path.join(__dirname, "migrations");
       const migrations = await readD1Migrations(migrationsPath);
       return {
-        wrangler: { configPath: "./wrangler.jsonc" },
+        wrangler: { configPath: "./wrangler.test.jsonc" },
         miniflare: {
           compatibilityDate: "2026-08-01",
           compatibilityFlags: ["nodejs_compat"],

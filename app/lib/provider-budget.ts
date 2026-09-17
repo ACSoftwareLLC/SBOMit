@@ -1,11 +1,11 @@
-import { AuditError } from "@/app/lib/errors";
+import { AuditError } from "./errors";
 import {
   getProviderLimit,
   getProviderUsage,
   recordProviderUsage,
   incrementCacheHits,
-} from "@/app/lib/db";
-import type { LlmInteraction } from "@/app/lib/llm";
+} from "./db";
+import type { LlmInteraction } from "./llm";
 
 export interface ProviderUsageMeta {
   cached: boolean;
