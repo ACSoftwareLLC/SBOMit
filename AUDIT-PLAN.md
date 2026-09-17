@@ -313,6 +313,12 @@ anonymous. Turnstile gate if abuse appears (see TODO §4.4).
 5. **Page component extraction** — **shipped**: `app/page.tsx` is pure
    orchestration (~156 lines); the form, progress card, result tabs,
    model picker, and explainer live in `app/components/`.
+6. **Diff notifications** — **shipped**: `runReAuditTick` fans out an
+   in-app notification to each watcher when a re-audit diff is
+   significant (new critical/high risk, new CVE, or score drop ≥ 10);
+   unread same-target rows collapse; served by `/api/notifications`
+   and the header bell feed. Spec:
+   `docs/superpowers/specs/2026-09-17-diff-notifications-design.md`.
 
 ---
 
