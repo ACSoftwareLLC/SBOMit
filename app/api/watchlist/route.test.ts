@@ -123,7 +123,9 @@ describe("/api/watchlist", () => {
   });
 
   it("requires authentication for GET, POST, and DELETE", async () => {
-    expect((await GET(jsonRequest("/api/watchlist", "GET", undefined))).status).toBe(401);
+    expect(
+      (await GET(jsonRequest("/api/watchlist", "GET", undefined))).status,
+    ).toBe(401);
     expect(
       (
         await POST(
@@ -138,11 +140,29 @@ describe("/api/watchlist", () => {
     ).toBe(401);
   });
 
+  it("returns 401 before body parsing on POST without a session", async () => {
+    // Auth-first ordering: even a request that would fail body parsing must
+    // answer 401 (not 400) when no session cookie is present.
+    const res = await POST(
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "https://www.npmjs.com/package/lodash" },
+      ),
+    );
+    expect(res.status).toBe(401);
+  });
+
   it("creates a watchlist item from a bare npm package name and lists it", async () => {
     const user = await seedUser("wl_route_a");
 
     const create = await POST(
-      jsonRequest("/api/watchlist", "POST", { libraryUrl: "lodash" }, user.cookie),
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "lodash" },
+        user.cookie,
+      ),
     );
     expect(create.status).toBe(201);
     const created = (await create.json()) as {
@@ -152,7 +172,9 @@ describe("/api/watchlist", () => {
     expect(created.item.name).toBe("lodash");
     expect(created.item.url).toBe("https://www.npmjs.com/package/lodash");
 
-    const list = await GET(jsonRequest("/api/watchlist", "GET", undefined, user.cookie));
+    const list = await GET(
+      jsonRequest("/api/watchlist", "GET", undefined, user.cookie),
+    );
     expect(list.status).toBe(200);
     const data = (await list.json()) as {
       items: Array<{ source: string; name: string }>;
@@ -184,12 +206,22 @@ describe("/api/watchlist", () => {
     const user = await seedUser("wl_route_c");
 
     const first = await POST(
-      jsonRequest("/api/watchlist", "POST", { libraryUrl: "lodash" }, user.cookie),
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "lodash" },
+        user.cookie,
+      ),
     );
     expect(first.status).toBe(201);
 
     const second = await POST(
-      jsonRequest("/api/watchlist", "POST", { libraryUrl: "lodash" }, user.cookie),
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "lodash" },
+        user.cookie,
+      ),
     );
     expect(second.status).toBe(409);
     const body = (await second.json()) as { code: string };
@@ -212,6 +244,43 @@ describe("/api/watchlist", () => {
     expect(body.code).toBe("UNSUPPORTED_SOURCE");
   });
 
+  it("captures full scoped package names (@types/lodash)", async () => {
+    const user = await seedUser("wl_route_h");
+
+    const create = await POST(
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "@types/lodash" },
+        user.cookie,
+      ),
+    );
+    expect(create.status).toBe(201);
+    const created = (await create.json()) as {
+      item: { source: string; name: string; url: string };
+    };
+    expect(created.item.source).toBe("npm");
+    expect(created.item.name).toBe("@types/lodash");
+    expect(created.item.url).toBe(
+      "https://www.npmjs.com/package/@types/lodash",
+    );
+
+    // Same scope, different package: must NOT spuriously 409.
+    const second = await POST(
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "@types/node" },
+        user.cookie,
+      ),
+    );
+    expect(second.status).toBe(201);
+    const secondBody = (await second.json()) as {
+      item: { name: string };
+    };
+    expect(secondBody.item.name).toBe("@types/node");
+  });
+
   it("rejects a missing libraryUrl with 400", async () => {
     const user = await seedUser("wl_route_e");
 
@@ -228,7 +297,12 @@ describe("/api/watchlist", () => {
     const other = await seedUser("wl_route_f2");
 
     const create = await POST(
-      jsonRequest("/api/watchlist", "POST", { libraryUrl: "lodash" }, owner.cookie),
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "lodash" },
+        owner.cookie,
+      ),
     );
     const { item } = (await create.json()) as { item: { id: number } };
 
@@ -251,11 +325,30 @@ describe("/api/watchlist", () => {
     const u1 = await seedUser("wl_route_g1");
     const u2 = await seedUser("wl_route_g2");
 
-    await POST(jsonRequest("/api/watchlist", "POST", { libraryUrl: "express" }, u1.cookie));
-    await POST(jsonRequest("/api/watchlist", "POST", { libraryUrl: "express" }, u2.cookie));
+    await POST(
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "express" },
+        u1.cookie,
+      ),
+    );
+    await POST(
+      jsonRequest(
+        "/api/watchlist",
+        "POST",
+        { libraryUrl: "express" },
+        u2.cookie,
+      ),
+    );
 
     const res = await DELETE(
-      jsonRequest("/api/watchlist", "DELETE", { libraryUrl: "express" }, u1.cookie),
+      jsonRequest(
+        "/api/watchlist",
+        "DELETE",
+        { libraryUrl: "express" },
+        u1.cookie,
+      ),
     );
     expect(res.status).toBe(200);
 

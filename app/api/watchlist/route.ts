@@ -7,7 +7,11 @@ import {
   removeWatchlistItemByUrl,
 } from "@/app/lib/db";
 import { requireAuth } from "@/app/lib/auth";
-import { parseJsonBody, parseWithSchema, withErrorHandling } from "@/app/lib/api";
+import {
+  parseJsonBody,
+  parseWithSchema,
+  withErrorHandling,
+} from "@/app/lib/api";
 import { AuditError } from "@/app/lib/errors";
 import { normalizeLibraryUrl, parseGitHubUrl } from "@/app/lib/audit";
 
@@ -29,8 +33,10 @@ function resolveTarget(input: string): WatchTarget {
       url: normalized,
     };
   }
-  // npm: normalizeLibraryUrl already produced /package/<name>
-  const match = normalized.match(/npmjs\.com\/package\/(.+?)(?:\/|$)/);
+  // npm: normalizeLibraryUrl already produced /package/<name>; the URL is
+  // canonical here, so the package name is the full tail (scoped names
+  // contain slashes: /package/@scope/pkg).
+  const match = normalized.match(/npmjs\.com\/package\/(.+)$/);
   if (match) {
     return {
       source: "npm",
@@ -45,41 +51,45 @@ function resolveTarget(input: string): WatchTarget {
   );
 }
 
-export const GET = withErrorHandling(async (request: Request): Promise<Response> => {
-  const db = await getDb();
-  const user = await requireAuth(db, request);
-  const items = await listWatchlistForUser(db, user.id);
-  return Response.json({ items });
-});
+export const GET = withErrorHandling(
+  async (request: Request): Promise<Response> => {
+    const db = await getDb();
+    const user = await requireAuth(db, request);
+    const items = await listWatchlistForUser(db, user.id);
+    return Response.json({ items });
+  },
+);
 
-export const POST = withErrorHandling(async (request: Request): Promise<Response> => {
-  const body = await parseJsonBody(request);
-  const { libraryUrl } = parseWithSchema(watchTargetSchema, body);
-  const db = await getDb();
-  const user = await requireAuth(db, request);
-  const target = resolveTarget(libraryUrl);
-  try {
-    const item = await addWatchlistItem(db, {
-      user_id: user.id,
-      ...target,
-    });
-    return Response.json({ item }, { status: 201 });
-  } catch (err) {
-    if (String(err).includes("UNIQUE")) {
-      throw new AuditError("CONFLICT", "Already watching this package.", 409);
+export const POST = withErrorHandling(
+  async (request: Request): Promise<Response> => {
+    const db = await getDb();
+    const user = await requireAuth(db, request);
+    const body = await parseJsonBody(request);
+    const { libraryUrl } = parseWithSchema(watchTargetSchema, body);
+    const target = resolveTarget(libraryUrl);
+    try {
+      const item = await addWatchlistItem(db, {
+        user_id: user.id,
+        ...target,
+      });
+      return Response.json({ item }, { status: 201 });
+    } catch (err) {
+      if (String(err).includes("UNIQUE")) {
+        throw new AuditError("CONFLICT", "Already watching this package.", 409);
+      }
+      throw err;
     }
-    throw err;
-  }
-});
+  },
+);
 
 export const DELETE = withErrorHandling(
   async (request: Request): Promise<Response> => {
+    const db = await getDb();
+    const user = await requireAuth(db, request);
     const body = (await parseJsonBody(request)) as {
       id?: unknown;
       libraryUrl?: unknown;
     };
-    const db = await getDb();
-    const user = await requireAuth(db, request);
     if (typeof body.id === "number") {
       const ok = await removeWatchlistItem(db, user.id, body.id);
       if (!ok) {
