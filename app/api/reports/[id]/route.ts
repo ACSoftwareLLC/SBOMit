@@ -1,6 +1,12 @@
 import { AuditError } from "@/app/lib/errors";
-import { getDb, getReportByPublicId } from "@/app/lib/db";
+import {
+  getDb,
+  getReportByPublicId,
+  getAuditById,
+  getPreviousAuditReport,
+} from "@/app/lib/db";
 import { auditResultSchema, type AuditResult } from "@/app/lib/audit";
+import { diffReports } from "@/app/lib/report-diff";
 import { checkRateLimit } from "@/app/lib/rate-limit";
 import { withErrorHandling } from "@/app/lib/api";
 
@@ -42,6 +48,35 @@ export const GET = withErrorHandling(async (
     );
   }
 
+  // ?diff=1 additionally compares this report against the newest earlier
+  // default-prompt report for the same name+source (on-read diffing; see
+  // docs/superpowers/specs/2026-09-16-re-audit-scheduling-design.md §6).
+  let diffPayload: { diff: ReturnType<typeof diffReports> | null; previousReportId: number | null } | undefined;
+  const url = new URL(request.url);
+  if (url.searchParams.get("diff") === "1") {
+    const audit = await getAuditById(db, report.audit_id);
+    const previous = audit
+      ? await getPreviousAuditReport(db, audit.name, audit.source, report.created_at)
+      : null;
+
+    if (previous && previous.id !== report.id) {
+      try {
+        const previousResult = auditResultSchema.parse(
+          JSON.parse(previous.result_json),
+        );
+        diffPayload = {
+          diff: diffReports(previousResult, result),
+          previousReportId: previous.id,
+        };
+      } catch {
+        // Previous report is corrupted — report no diff rather than failing.
+        diffPayload = { diff: null, previousReportId: null };
+      }
+    } else {
+      diffPayload = { diff: null, previousReportId: null };
+    }
+  }
+
   return Response.json(
     {
       report: {
@@ -50,6 +85,7 @@ export const GET = withErrorHandling(async (
         score: report.score,
         createdAt: report.created_at,
         result,
+        ...(diffPayload ?? {}),
       },
     },
     {
