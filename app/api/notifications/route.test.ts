@@ -211,6 +211,33 @@ describe("/api/notifications", () => {
     expect(res.status).toBe(401);
   });
 
+  it("answers 400 MISSING_INPUT for malformed JSON on read with a session", async () => {
+    const user = await seedUser("ntf_malformed");
+    const res = await markRead(
+      new Request("http://localhost/api/notifications/read", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: user.cookie,
+        },
+        body: "not json",
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("MISSING_INPUT");
+  });
+
+  it("rejects non-numeric limit with 400 MISSING_INPUT", async () => {
+    const user = await seedUser("ntf_limitabc");
+    const res = await GET(
+      getRequest("/api/notifications?limit=abc", user.cookie),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("MISSING_INPUT");
+  });
+
   it("lists seeded items with resolved public ids and unreadCount", async () => {
     const user = await seedUser("ntf_a");
     const reportId = await seedReport("rep-aaa");
@@ -362,6 +389,8 @@ describe("/api/notifications", () => {
       getRequest("/api/notifications?limit=0", user.cookie),
     );
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("MISSING_INPUT");
   });
 
   it("rejects ids arrays over the 99-element D1 bound with 400", async () => {
@@ -374,5 +403,7 @@ describe("/api/notifications", () => {
       ),
     );
     expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string };
+    expect(body.code).toBe("MISSING_INPUT");
   });
 });
