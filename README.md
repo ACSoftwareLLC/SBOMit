@@ -91,7 +91,7 @@ app/
   login/, register/, profile/, reset-password/  Auth pages
   settings/                   Provider/user settings
   stats/                      Personal usage statistics
-    report/[id]/                Shareable persisted report page
+  report/[id]/                Shareable persisted report page
 migrations/                   D1 SQL migrations
 scripts/
   apply-migrations.sh         Apply local/remote D1 migrations + regenerate types
