@@ -7,7 +7,7 @@ import {
 } from "@/app/lib/db";
 import { MissingInputError, ReportNotFoundError } from "@/app/lib/errors";
 import type { LlmInteraction } from "@/app/lib/llm";
-import type { AuditResult } from "@/app/lib/audit";
+import { auditResultSchema, type AuditResult } from "@/app/lib/audit";
 import { diffReports } from "@/app/lib/report-diff";
 import { withErrorHandling } from "@/app/lib/api";
 
@@ -65,7 +65,9 @@ export const GET = withErrorHandling(async (
     );
     if (previous && previous.id !== report.id) {
       try {
-        const previousResult = JSON.parse(previous.result_json) as AuditResult;
+        const previousResult = auditResultSchema.parse(
+          JSON.parse(previous.result_json),
+        );
         diffPayload = {
           diff: diffReports(previousResult, result),
           previousReportId: previous.id,
