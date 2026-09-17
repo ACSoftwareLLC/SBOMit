@@ -357,6 +357,10 @@ export default function AuditsPage() {
         if (!res.ok || data.error) {
           throw new Error(data.error || "Failed to update watchlist.");
         }
+        // Refetch the authoritative state on success too: a stale in-flight
+        // mount read can otherwise overwrite the optimistic update and leave
+        // the star contradicting the database.
+        await fetchWatchlist();
       } catch (error) {
         await fetchWatchlist();
         setHistoryError(
