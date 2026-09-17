@@ -105,3 +105,15 @@ export async function markTargetAudited(
     .bind(source, name)
     .run();
 }
+
+export async function listWatchersForTarget(
+  db: D1Database,
+  source: string,
+  name: string,
+): Promise<Array<{ user_id: number }>> {
+  const { results } = await db
+    .prepare(`SELECT user_id FROM watchlist WHERE source = ? AND name = ?`)
+    .bind(source, name)
+    .all<{ user_id: number }>();
+  return results ?? [];
+}
