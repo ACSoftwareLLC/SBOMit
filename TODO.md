@@ -5,8 +5,8 @@ Each milestone gets its own spec → plan → implementation cycle when it start
 
 **Current state:** 1.x (user system) shipped. Milestone 2 (foundation
 cleanup) shipped — page extraction, auth consolidation, doc refresh.
-Milestone 3 (re-audit scheduling) is the planned v2 feature
-(AUDIT-PLAN.md §7.3); milestone 4 collects optional follow-ups.
+Milestone 3 (re-audit scheduling) shipped — watchlist, cron re-audits,
+report diffs. Milestone 4 collects optional follow-ups.
 
 ---
 
@@ -66,14 +66,19 @@ top-level `AuthProvider` + `useAuthContext` in `app/layout.tsx`.
 
 ---
 
-## Milestone 3 — Re-audit scheduling (v2 feature, architectural)
+## Milestone 3 — Re-audit scheduling (v2 feature, architectural) — ✅ SHIPPED
 
-Goal: close AUDIT-PLAN.md §7.4 — re-run audits for watchlisted packages on
-a schedule and diff against the previous report. This is new-subsystem
-work (cron binding, new tables, new UI surface), so it gets the full
-brainstorm → spec → plan cycle before implementation.
+Goal: close AUDIT-PLAN.md §7.3 — re-run audits for watchlisted packages on
+a schedule and diff against the previous report. Shipped: per-user
+watchlist (`0014_watchlist.sql`, `/api/watchlist`), custom-worker Cron
+Trigger every 6h (`worker.ts`, `runReAuditTick` in `app/lib/re-audit.ts`,
+budget-gated via `app/lib/provider-budget.ts`, fan-out capped by
+`RE_AUDIT_MAX_PER_TICK`), on-read report diffs (`app/lib/report-diff.ts`,
+`ReportDiffCard` on `/report/[id]`), watch toggle on `/audits`, and admin
+trigger `POST /api/admin/re-audit`. Spec:
+`docs/superpowers/specs/2026-09-16-re-audit-scheduling-design.md`.
 
-Rough shape (to be validated during spec):
+Original shape (all landed, with the resolved decisions):
 
 - **Watchlist table** — `0014_watchlist.sql`: users "watch" a package
   (source+name+version), D1-backed CRUD via `/api/watchlist`.
@@ -90,12 +95,15 @@ Rough shape (to be validated during spec):
   budgets (`app/lib/provider-budget.ts`) so scheduled work cannot starve
   interactive audits.
 
-Open questions to resolve during brainstorm/spec:
+Open questions resolved during brainstorm/spec:
 
-- Diff granularity: full report diff vs. risks/advisories-only diff.
-- Fan-out bound: how many re-audits per cron tick under token budgets.
-- Whether watchlist is per-user or per-package-global with per-user
-  subscribers.
+- Diff granularity: risks/score/advisories diff computed on read (no
+  stored diffs).
+- Fan-out bound: max 5 targets per cron tick, sequential, budget-gated
+  (`RE_AUDIT_MAX_PER_TICK`).
+- Watchlist ownership: per-user watch entries with per-target dedupe
+  (`watchlist_targets`), one re-audit per package per tick regardless of
+  watcher count.
 
 ---
 
