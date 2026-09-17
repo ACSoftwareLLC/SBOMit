@@ -5,6 +5,13 @@ import {
 } from "./db";
 import { runAudit } from "./run-audit";
 import { checkProviderBudget, finalizeProviderUsage } from "./provider-budget";
+import {
+  getAuditReportById,
+  getPreviousAuditReport,
+} from "./db";
+import { auditResultSchema } from "./audit";
+import { diffReports } from "./report-diff";
+import { isDiffSignificant, notifyWatchersOfDiff } from "./notifications";
 
 export interface ReAuditTickResult {
   attempted: number;
@@ -16,6 +23,8 @@ export interface ReAuditTickResult {
     name: string;
     status: "ok" | "error";
     error?: string;
+    /** Set when post-audit notification generation failed (best-effort). */
+    notifyError?: string;
   }>;
 }
 
@@ -72,11 +81,52 @@ export async function runReAuditTick(
         interactions: run.meta.interactions,
       });
       await markTargetAudited(db, target.source, target.name);
+      // Best-effort notification generation (M4): a failure here must never
+      // fail the target — the audit and its token spend already succeeded.
+      let notifyError: string | undefined;
+      try {
+        const newReport = await getAuditReportById(db, run.meta.reportId);
+        const previous = newReport
+          ? await getPreviousAuditReport(
+              db,
+              target.name,
+              target.source,
+              newReport.created_at,
+            )
+          : null;
+        if (previous && previous.id !== newReport?.id) {
+          let diff;
+          try {
+            const previousResult = auditResultSchema.parse(
+              JSON.parse(previous.result_json),
+            );
+            diff = diffReports(previousResult, run.result);
+          } catch {
+            // Corrupted previous report — skip notification rather than fail.
+            diff = null;
+          }
+          if (diff && isDiffSignificant(diff)) {
+            await notifyWatchersOfDiff(
+              db,
+              target,
+              diff,
+              run.meta.reportId,
+              previous.id,
+            );
+          }
+        }
+      } catch (notifyErr) {
+        notifyError =
+          notifyErr instanceof Error
+            ? notifyErr.message
+            : String(notifyErr);
+      }
       result.succeeded += 1;
       result.details.push({
         source: target.source,
         name: target.name,
         status: "ok",
+        ...(notifyError !== undefined ? { notifyError } : {}),
       });
     } catch (err) {
       result.failed += 1;
