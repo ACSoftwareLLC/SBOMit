@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Loader2, Settings, Shield, User, LogOut, Users, BarChart3, ShieldAlert } from "lucide-react";
 import { useAuditJobs } from "./audit-jobs";
+import { NotificationBell } from "./notification-bell";
 import { useAuth } from "@/app/lib/use-auth";
 import { cn } from "@/app/lib/utils";
 
@@ -80,6 +81,8 @@ export function SiteHeader() {
             <Settings className="h-4 w-4" />
             Settings
           </Link>
+
+          {user && <NotificationBell />}
 
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
