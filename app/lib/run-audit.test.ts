@@ -247,3 +247,87 @@ describe("runAudit", () => {
     ).toBe(false);
   });
 });
+
+describe("runAudit skipCache", () => {
+  beforeEach(() => {
+    mockResolveLibrary.mockResolvedValue({
+      source: "npm",
+      url: "https://www.npmjs.com/package/lodash",
+      name: "lodash",
+      version: "4.17.21",
+      metadata: {},
+    });
+    mockResolveCodebase.mockResolvedValue({
+      files: [{ path: "package.json", size: 100, content: "{}" }],
+      fileCount: 1,
+      totalSize: 100,
+    });
+    mockEnrichLibrary.mockResolvedValue({ advisories: [] });
+    mockComputeCacheKey.mockResolvedValue("cache-key-123");
+    mockGetDb.mockResolvedValue({
+      prepare: () => ({ bind: () => ({ first: mockDbFirst }) }),
+    });
+    mockDbFirst.mockResolvedValue(null);
+    mockGetCachedAuditReport.mockResolvedValue(null);
+    mockRunLibraryAudit.mockResolvedValue({
+      result: baseResult,
+      interactions: [baseInteraction],
+    });
+    mockGetLlmConfig.mockReturnValue({ model: "gpt-4o-mini" });
+    mockSaveAuditReport.mockResolvedValue({ auditId: 1, reportId: 2 });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("bypasses the cache lookup when skipCache is true", async () => {
+    mockGetCachedAuditReport.mockResolvedValue({
+      id: 99,
+      audit_id: 9,
+      result_json: JSON.stringify(baseResult),
+      interaction_json: JSON.stringify([baseInteraction]),
+      codebase_inspected: 1,
+      created_at: new Date().toISOString(),
+    });
+
+    const { meta } = await runAudit({
+      libraryUrl: "https://www.npmjs.com/package/lodash",
+      skipCache: true,
+    });
+
+    expect(mockGetCachedAuditReport).not.toHaveBeenCalled();
+    expect(meta.cached).toBe(false);
+  });
+
+  it("persists with cache_key NULL when skipCache is true", async () => {
+    await runAudit({
+      libraryUrl: "https://www.npmjs.com/package/lodash",
+      skipCache: true,
+    });
+
+    expect(mockSaveAuditReport).toHaveBeenCalledTimes(1);
+    const saved = mockSaveAuditReport.mock.calls[0][1];
+    expect(saved.cacheKey).toBeUndefined();
+  });
+
+  it("still uses the cache when skipCache is unset", async () => {
+    mockGetCachedAuditReport.mockResolvedValue({
+      id: 99,
+      audit_id: 9,
+      result_json: JSON.stringify(baseResult),
+      interaction_json: JSON.stringify([baseInteraction]),
+      codebase_inspected: 1,
+      created_at: new Date().toISOString(),
+    });
+
+    const { meta } = await runAudit({
+      libraryUrl: "https://www.npmjs.com/package/lodash",
+    });
+
+    expect(mockGetCachedAuditReport).toHaveBeenCalledTimes(1);
+    expect(meta.cached).toBe(true);
+    expect(meta.reportId).toBe(99);
+    expect(mockSaveAuditReport).not.toHaveBeenCalled();
+  });
+});
