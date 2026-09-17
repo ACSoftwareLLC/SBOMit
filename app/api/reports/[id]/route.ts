@@ -51,7 +51,11 @@ export const GET = withErrorHandling(async (
   // ?diff=1 additionally compares this report against the newest earlier
   // default-prompt report for the same name+source (on-read diffing; see
   // docs/superpowers/specs/2026-09-16-re-audit-scheduling-design.md §6).
-  let diffPayload: { diff: ReturnType<typeof diffReports> | null; previousReportId: number | null } | undefined;
+  let diffPayload: {
+    diff: ReturnType<typeof diffReports> | null;
+    previousReportId: number | null;
+    previousReportPublicId: string | null;
+  } | undefined;
   const url = new URL(request.url);
   if (url.searchParams.get("diff") === "1") {
     const audit = await getAuditById(db, report.audit_id);
@@ -67,13 +71,22 @@ export const GET = withErrorHandling(async (
         diffPayload = {
           diff: diffReports(previousResult, result),
           previousReportId: previous.id,
+          previousReportPublicId: previous.public_id,
         };
       } catch {
         // Previous report is corrupted — report no diff rather than failing.
-        diffPayload = { diff: null, previousReportId: null };
+        diffPayload = {
+          diff: null,
+          previousReportId: null,
+          previousReportPublicId: null,
+        };
       }
     } else {
-      diffPayload = { diff: null, previousReportId: null };
+      diffPayload = {
+        diff: null,
+        previousReportId: null,
+        previousReportPublicId: null,
+      };
     }
   }
 
