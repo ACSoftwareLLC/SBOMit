@@ -6,7 +6,58 @@ Each milestone gets its own spec → plan → implementation cycle when it start
 **Current state:** 1.x (user system) shipped. Milestone 2 (foundation
 cleanup) shipped — page extraction, auth consolidation, doc refresh.
 Milestone 3 (re-audit scheduling) shipped — watchlist, cron re-audits,
-report diffs. Milestone 4 collects optional follow-ups.
+report diffs. Milestone 4 (diff notifications) is the next featureset.
+Milestone 5 collects the remaining backlog.
+
+---
+
+## Milestone 4 — Diff notifications (architectural)
+
+Goal: close the loop M3 opened. Watchlisted packages get re-audited on
+the cron schedule and diffs are computed — but watchers must currently
+rediscover them manually. M4 notifies each watcher when a re-audit of
+their watched package produces a meaningful change. Explicitly deferred
+in the M3 spec ("notifications land later").
+
+User-approved scope (brainstorm 2026-09-17): **in-app feed only**
+(bell icon, unread count, mark-read — D1-backed, works for every user,
+no external dependencies); **generated in the cron tick** (no separate
+scheduling pass). Email/webhook channels stay out of scope.
+
+### 4.1 Schema + generation
+
+- `0015_notifications.sql`: `notifications` table (id, user_id FK
+  CASCADE, type `re_audit_diff`, report_id, previous_report_id,
+  title, body, read INTEGER DEFAULT 0, created_at; index user_id+read).
+- `app/lib/notifications.ts` — `notifyWatchersOfDiff(db, target, diff,
+  reportId, previousReportId)`: fan out one row per watcher of the
+  target (from `watchlist`), called from `runReAuditTick` after a
+  successful re-audit when the diff is **significant**.
+- Significance thresholds (tunable constants): any new critical/high
+  risk, any new CVE, or score drop ≥ 10. Pure helper
+  `isDiffSignificant(diff)` — unit-tested.
+
+### 4.2 API + UI
+
+- `GET /api/notifications` (auth; `?unread=1` filter; paginated) and
+  `POST /api/notifications/read` (`{ids?}` — all when omitted).
+- `NotificationBell` in `site-header.tsx`: poll `/api/notifications?unread=1`
+  on mount + after each `runReAuditTick`-visible event (cheap interval,
+  e.g. 60s, or on page focus); unread badge; dropdown list linking to
+  `/report/[publicId]`.
+- Reuse `previousReportPublicId` for links.
+
+### 4.3 Tests
+
+- Unit: `isDiffSignificant` boundary cases; fan-out (N watchers → N
+  rows); no notification on insignificant diff; read-marking.
+- Route tests: auth required, ownership, pagination, mark-all.
+- e2e: bell renders with badge after seeding a notification directly
+  via API/DB; clicking navigates to the report.
+
+Open questions to resolve at spec time: dedupe (same target audited
+twice before a user reads — collapse or stack?), badge polling cadence,
+and whether `notifyWatchersOfDiff` blocks the tick or best-effort.
 
 ---
 
@@ -107,22 +158,22 @@ Open questions resolved during brainstorm/spec:
 
 ---
 
-## Milestone 4 — Optional follow-ups (backlog)
+## Milestone 5 — Remaining backlog (was M4)
 
-- **4.1 KV hot cache** (AUDIT-PLAN.md §3.4) — short-TTL cache for trending
+- **5.1 KV hot cache** (AUDIT-PLAN.md §3.4) — short-TTL cache for trending
   packages ahead of the D1 `audit_reports` cache. Blocked on deciding to
   bind KV in `wrangler.jsonc`; D1-only cache works today.
-- **4.2 Source adapters: PyPI / crates.io** (AUDIT-PLAN.md §7.1) — new
+- **5.2 Source adapters: PyPI / crates.io** (AUDIT-PLAN.md §7.1) — new
   adapters implement the `LibraryContext` contract; enrichment + scoring
   need per-registry signal mappings.
-- **4.3 Turnstile gate** (AUDIT-PLAN.md §6) — add Cloudflare
+- **5.3 Turnstile gate** (AUDIT-PLAN.md §6) — add Cloudflare
   Turnstile to `/api/audit` if anonymous abuse appears; only after
   rate-limit data justifies it.
-- **4.4 Dependency tree for GitHub repos** — `/api/dependencies` parity
+- **5.4 Dependency tree for GitHub repos** — `/api/dependencies` parity
   with npm now that `fetchGitHubPackageJson` exists; likely small once
   2.x lands.
-- **4.5 Enrichment signal registry** (AUDIT-PLAN.md §7.2 signals) —
+- **5.5 Enrichment signal registry** (AUDIT-PLAN.md §7.2 signals) —
   formalize the hardcoded signal list in `app/lib/signals.ts` into a
-  registry pattern to make 4.2 cheaper.
+  registry pattern to make 5.2 cheaper.
 
 \ No newline at end of file
